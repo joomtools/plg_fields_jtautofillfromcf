@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<extension type="plugin" version="3.9.0" group="fields" method="upgrade">
+    <name>plg_fields_jtautofillfromusercf</name>
+    <author>Guido De Gobbis</author>
+    <creationDate>##DATE##</creationDate>
+    <copyright>(c) JoomTools. All rights reserved.</copyright>
+    <license>GNU General Public License version 3 or later; see LICENSE.txt</license>
+    <authorEmail>support@joomtools.de</authorEmail>
+    <authorUrl>https://github.com/JoomTools/plg_fields_jtautofillfromusercf</authorUrl>
+    <version>##VERSION##</version>
+    <description>PLG_FIELDS_JTAUTOFILLFROMUSERCF_XML_DESCRIPTION</description>
+    <files>
+        ##FILES##
+    </files>
+</extension>
