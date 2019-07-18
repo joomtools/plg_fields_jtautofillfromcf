@@ -1,1 +1,1 @@
-# plg_fields_jtautofillfromusercf
+# plg_fields_jtautofillfromcf
