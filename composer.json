@@ -1,6 +1,6 @@
 {
-  "name"       : "JoomTools/plg_fields_jtautofillfromusercf",
-  "description": "Autofill content custom field with value from user custom field.",
+  "name"       : "JoomTools/plg_fields_jtautofillfromcf",
+  "description": "Autofill content custom field with value from custom field.",
   "license"    : "GPL-3+",
   "require"    : {
     "php": ">=7.0"
