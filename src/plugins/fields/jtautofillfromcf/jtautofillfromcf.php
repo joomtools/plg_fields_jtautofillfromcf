@@ -13,13 +13,15 @@ defined('_JEXEC') or die;
 use Joomla\Utilities\ArrayHelper;
 use Joomla\CMS\Factory;
 use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+use Joomla\CMS\Form\Form;
+use Joomla\CMS\Language\Text;
 
 JLoader::import('components.com_fields.libraries.fieldsplugin', JPATH_ADMINISTRATOR);
 
 JFormHelper::addFieldPath(__DIR__ . '/fields');
 
 /**
- * Fields Text Plugin
+ * Fields Autofill Plugin
  *
  * @since  1.0.0
  */
@@ -35,7 +37,7 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 	/**
 	 * Show field only in allowed sections
 	 *
-	 * @return   array|\string[][]
+	 * @return   array|string[][]
 	 *
 	 * @since   1.0.0
 	 */
@@ -55,14 +57,14 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 	/**
 	 * Set context for validation of allowed sections
 	 *
-	 * @param   \JForm     $form
-	 * @param   \stdClass  $data
+	 * @param   Form      $form
+	 * @param   stdClass  $data
 	 *
 	 * @return   void
 	 *
 	 * @since   1.0.0
 	 */
-	public function onContentPrepareForm(JForm $form, $data)
+	public function onContentPrepareForm(Form $form, $data)
 	{
 		$this->context = $form->getName();
 
@@ -70,55 +72,167 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 	}
 
 	/**
+	 * Prepares the field
+	 *
+	 * @param   string    $context  The context.
+	 * @param   stdclass  $item     The item.
+	 * @param   stdclass  $field    The field.
+	 *
+	 * @return   string
+	 *
+	 * @since   1.0.0
+	 */
+	public function onCustomFieldsPrepareField($context, $item, $field)
+	{
+		// Check if the field should be processed
+		if (!$this->isTypeSupported($field->type))
+		{
+			return null;
+		}
+
+		$app       = Factory::getApplication();
+		$cfField   = $field->fieldparams->get('cfield');
+
+		// Get field id and field context from param
+		list($cfFieldId, $cfFieldContext) = explode(',', $cfField);
+
+		$cfFieldId  = (int) $cfFieldId;
+		$valueId    = (int) Factory::getUser()->id;
+		$articleId  = $app->input->getInt('id');
+		$fieldValue = !empty($field->rawvalue);
+
+		if ($app->isClient('site'))
+		{
+			$articleId = $app->input->getInt('a_id');
+		}
+
+		$fieldsModel = BaseDatabaseModel::getInstance('Field', 'FieldsModel', array('ignore_request' => true));
+
+		if (!empty($articleId))
+		{
+			$valueId = $articleId;
+
+			if ($cfFieldContext == 'com_users.user')
+			{
+				$valueId = (int) $this->getArticleUserId($articleId);
+			}
+		}
+
+		if (!empty($valueId))
+		{
+			$defaultValue = $fieldsModel->getFieldValue($cfFieldId, $valueId);
+
+			if ($fieldValue === false)
+			{
+				$field->default_value = $defaultValue;
+				$field->value         = Text::_($defaultValue);
+				$field->rawvalue      = $defaultValue;
+			}
+		}
+
+		// The field's rawvalue should be an array
+		if (!is_array($field->rawvalue))
+		{
+			$field->rawvalue = (array) $field->rawvalue;
+		}
+
+		return parent::onCustomFieldsPrepareField($context, $item, $field);
+	}
+
+	/**
+	 * Get custom field from param.
+	 *
+	 * @param   string  $param
+	 *
+	 * @return   stdclass
+	 *
+	 * @since   1.0.0
+	 */
+	private function getCustomField($param)
+	{
+		// Get field id and field context from param
+		list($fieldId, $fieldContext) = explode(',', $param);
+
+		// Get user custom fields
+		$fields = FieldsHelper::getFields($fieldContext);
+
+		// Set field id as array key
+		$fields = ArrayHelper::pivot($fields, 'id');
+
+		return $fields[$fieldId];
+	}
+
+	/**
 	 * Transforms the field into a DOM XML element and appends it as a child on the given parent.
 	 *
 	 * @param   stdClass    $field   The field.
 	 * @param   DOMElement  $parent  The field node parent.
-	 * @param   JForm       $form    The form.
+	 * @param   Form        $form    The form.
 	 *
 	 * @return   DOMElement
 	 *
 	 * @since   1.0.0
 	 */
-	public function onCustomFieldsPrepareDom($field, DOMElement $parent, JForm $form)
+	public function onCustomFieldsPrepareDom($field, DOMElement $parent, Form $form)
 	{
 		if ($field->type != 'jtautofillfromcf')
 		{
 			return null;
 		}
 
-		$cfField = $field->fieldparams->get('cfield');
+		$app       = Factory::getApplication();
+		$cfField   = $field->fieldparams->get('cfield');
 
+		// Get field id and field context from param
 		list($cfFieldId, $cfFieldContext) = explode(',', $cfField);
 
 
-		$userId      = (int) Factory::getUser()->id;
-		$articleId   = Factory::getApplication()->input->getInt('a_id');
-		$fieldsModel = BaseDatabaseModel::getInstance('Field', 'FieldsModel', array('ignore_request' => true));
+		$cfFieldId    = (int) $cfFieldId;
+		$valueId      = (int) Factory::getUser()->id;
+		$articleId    = $app->input->getInt('id');
+		$newField     = $this->getCustomField($cfField);
+		$fieldValue   = !empty($field->rawvalue);
+		$defaultValue = '';
 
-		if ($articleId !== null)
+		if ($app->isClient('site'))
 		{
-			$userId = (int) $this->getUserId($articleId);
+			$articleId = $app->input->getInt('a_id');
 		}
 
-		// Get user custom fields
-		$fields = FieldsHelper::getFields($cfFieldContext);
+		$fieldsModel = BaseDatabaseModel::getInstance('Field', 'FieldsModel', array('ignore_request' => true));
 
-		// Set field id as array key
-		$fields = ArrayHelper::pivot($fields, 'id');
-
-		$newField     = $fields[$cfFieldId];
-		$fieldValue   = $field->rawvalue;
-		$cfFieldValue = $fieldsModel->getFieldValue($cfFieldId, $userId);
-
-		if ($fieldValue === null)
+		if (!empty($articleId))
 		{
-			$field->default_value = $cfFieldValue;
+			$valueId = $articleId;
+
+			if ($cfFieldContext == 'com_users.user')
+			{
+				$valueId = (int) $this->getArticleUserId($articleId);
+			}
+		}
+
+		if (!empty($valueId))
+		{
+			$defaultValue = $fieldsModel->getFieldValue($cfFieldId, $valueId);
+
+			if ($fieldValue === false)
+			{
+				$field->default_value = $defaultValue;
+//				$field->value         = Text::_($defaultValue);
+				$field->rawvalue      = $defaultValue;
+			}
+			else
+			{
+				$this->setFieldValue($field->id, $valueId, $field->rawvalue);
+			}
 		}
 
 		$fieldNode = parent::onCustomFieldsPrepareDom($field, $parent, $form);
 
 		$fieldNode->setAttribute('type', $newField->type);
+
+		// Set the specific field parameters
+		$fieldNode = $this->setParamsCustomField($newField, $fieldNode);
 
 		// Check if it is allowed to edit the field
 		if (!FieldsHelper::canEditFieldValue($field))
@@ -127,31 +241,40 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 
 			if ($articleId !== null)
 			{
-				if ($fieldValue != $cfFieldValue)
+				if ($fieldValue === false)
 				{
-					$this->setFieldValue($field->id, $articleId, $cfFieldValue);
+					$this->setFieldValue($field->id, $articleId, $defaultValue);
 				}
 			}
 		}
 
-		// Set the specific field parameters
-		foreach ($newField->fieldparams->toArray() as $key => $param)
+		return $fieldNode;
+	}
+
+	/**
+	 * Returns an array of key values to put in a list from the given field.
+	 *
+	 * @param   stdClass  $field  The field.
+	 *
+	 * @return   array
+	 *
+	 * @since   1.0.0
+	 */
+	private function getOptionsFromField($field)
+	{
+		$data = array();
+
+		// Fetch the options from the plugin
+		$params = clone $this->params;
+		$params->merge($field->fieldparams);
+
+		foreach ($params->get('options', array()) as $option)
 		{
-			if (is_array($param))
-			{
-				// Multidimensional arrays (eg. list options) can't be transformed properly
-				$param = count($param) == count($param, COUNT_RECURSIVE) ? implode(',', $param) : '';
-			}
-
-			if ($param === '' || (!is_string($param) && !is_numeric($param)))
-			{
-				continue;
-			}
-
-			$fieldNode->setAttribute($key, $param);
+			$op = (object) $option;
+			$data[$op->value] = $op->name;
 		}
 
-		return $fieldNode;
+		return $data;
 	}
 
 	/**
@@ -160,9 +283,10 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 	 * @param   int  articleId
 	 *
 	 * @return   int
+	 *
 	 * @since    1.0.0
 	 */
-	private function getUserId($articleId)
+	private function getArticleUserId($articleId)
 	{
 		$db = Factory::getDbo();
 
@@ -183,7 +307,7 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 	 * @param   string  $itemId   The ID of the item.
 	 * @param   string  $value    The value.
 	 *
-	 * @return  boolean
+	 * @return   boolean
 	 *
 	 * @since   1.0.0
 	 */
@@ -259,6 +383,55 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 		FieldsHelper::clearFieldsCache();
 
 		return true;
+	}
+
+	/**
+	 * Set the specific field parameters
+	 *
+	 * @param   stdClass     $newField
+	 * @param   DOMElement  $fieldNode
+	 *
+	 * @return   DOMElement
+	 *
+	 * @since   1.0.0
+	 */
+	private function setParamsCustomField($newField, DOMElement $fieldNode)
+	{
+		foreach ($newField->fieldparams->toArray() as $key => $param)
+		{
+			if (is_array($param))
+			{
+				// Multidimensional arrays (eg. list options) can't be transformed properly
+				$param = count($param) == count($param, COUNT_RECURSIVE) ? implode(',', $param) : '';
+			}
+
+			if ($param === '' || (!is_string($param) && !is_numeric($param)))
+			{
+				continue;
+			}
+
+			$fieldNode->setAttribute($key, $param);
+		}
+
+		if (in_array($newField->type, array('list', 'radio', 'checkboxes', 'combo'))
+			&& !empty($newField->fieldparams->get('options', null)))
+		{
+			if ($newField->type != 'combo')
+			{
+				$fieldNode->setAttribute('validate', 'options');
+			}
+
+			foreach ($this->getOptionsFromField($newField) as $value => $name)
+			{
+				$option              = new DOMElement('option', htmlspecialchars($value, ENT_COMPAT, 'UTF-8'));
+				$option->textContent = htmlspecialchars(JText::_($name), ENT_COMPAT, 'UTF-8');
+
+				$element = $fieldNode->appendChild($option);
+				$element->setAttribute('value', $value);
+			}
+		}
+
+		return $fieldNode;
 	}
 
 }

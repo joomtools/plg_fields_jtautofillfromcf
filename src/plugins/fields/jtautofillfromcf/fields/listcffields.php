@@ -66,5 +66,4 @@ class JFormFieldListcffields extends JFormFieldGroupedList
 
 		return $options;
 	}
-
 }
