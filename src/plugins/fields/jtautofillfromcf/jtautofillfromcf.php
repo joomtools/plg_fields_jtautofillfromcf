@@ -227,6 +227,11 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 			}
 		}
 
+		$oldFieldparams = $field->fieldparams->toArray();
+		$newFieldparams = $newField->fieldparams->toArray();
+		$fieldparams = array_merge($oldFieldparams, $newFieldparams);
+		$field->fieldparams = new Joomla\Registry\Registry($fieldparams);
+
 		$fieldNode = parent::onCustomFieldsPrepareDom($field, $parent, $form);
 
 		$fieldNode->setAttribute('type', $newField->type);
