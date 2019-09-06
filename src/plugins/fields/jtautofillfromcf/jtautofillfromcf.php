@@ -234,10 +234,13 @@ class PlgFieldsJtAutofillFromCf extends FieldsPlugin
 
 		$fieldNode = parent::onCustomFieldsPrepareDom($field, $parent, $form);
 
-		$fieldNode->setAttribute('type', $newField->type);
+		if (!empty($fieldNode))
+		{
+			$fieldNode->setAttribute('type', $newField->type);
 
-		// Set the specific field parameters
-		$fieldNode = $this->setParamsCustomField($newField, $fieldNode);
+			// Set the specific field parameters
+			$fieldNode = $this->setParamsCustomField($newField, $fieldNode);
+		}
 
 		// Check if it is allowed to edit the field
 		if (!FieldsHelper::canEditFieldValue($field))
