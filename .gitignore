@@ -40,7 +40,9 @@ phing-latest.phar
 /Gemfile.lock
 
 # composer
+composer.lock
 composer.phar
+composer.lock
 vendor/*
 
 # Robo
